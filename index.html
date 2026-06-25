@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecureAuth | پروژه امنیت اطلاعات</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root{
+    --bg:#0a0e1a;
+    --panel:#0d1326;
+    --card:#131a30;
+    --field:#0d1326;
+    --border:#222b47;
+    --text:#e7eaf6;
+    --muted:#7c87ab;
+    --accent:#34d6b4;
+    --accent-soft:rgba(52,214,180,.14);
+    --danger:#ff6b6b;
+    --warn:#ffb454;
+    --radius:16px;
+    --mono:'JetBrains Mono', monospace;
+    --sans:'Vazirmatn', sans-serif;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    font-family:var(--sans);
+    background:
+      radial-gradient(900px 500px at 15% -10%, rgba(52,214,180,.08), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:28px;
+  }
+  .shell{
+    width:100%;
+    max-width:960px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:24px;
+    display:grid;
+    grid-template-columns:340px 1fr;
+    overflow:hidden;
+    box-shadow:0 30px 80px -20px rgba(0,0,0,.55);
+  }
+
+  /* ===== پنل کنسول امنیتی (سمت چپ) ===== */
+  .console{
+    background:
+      linear-gradient(180deg, rgba(52,214,180,.06), transparent 40%),
+      var(--panel);
+    border-left:1px solid var(--border);
+    padding:32px 28px;
+    display:flex;
+    flex-direction:column;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .brand svg{ width:26px; height:26px; flex-shrink:0; }
+  .brand span{ font-weight:700; font-size:17px; letter-spacing:.2px; }
+  .console p.tag{
+    color:var(--muted); font-size:12.5px; margin:0 0 26px; line-height:1.7;
+  }
+  .console-list{ display:flex; flex-direction:column; gap:14px; flex:1; }
+  .console-item{
+    opacity:0; transform:translateY(6px);
+    animation:rise .45s ease forwards;
+  }
+  .console-item:nth-child(1){ animation-delay:.05s; }
+  .console-item:nth-child(2){ animation-delay:.15s; }
+  .console-item:nth-child(3){ animation-delay:.25s; }
+  .console-item:nth-child(4){ animation-delay:.35s; }
+  .console-item:nth-child(5){ animation-delay:.45s; }
+  .console-item:nth-child(6){ animation-delay:.55s; }
+  @keyframes rise{ to{ opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce){
+    .console-item{ animation:none; opacity:1; transform:none; }
+  }
+  .console-item .tag-line{
+    font-family:var(--mono); font-size:11px; color:var(--accent);
+    display:flex; align-items:center; gap:7px; margin-bottom:3px;
+  }
+  .console-item .tag-line::before{ content:"›"; opacity:.7; }
+  .console-item .desc{ font-size:12.5px; color:var(--muted); line-height:1.6; padding-right:16px; }
+  .console-foot{
+    margin-top:24px; padding-top:18px; border-top:1px dashed var(--border);
+    font-family:var(--mono); font-size:11px; color:var(--muted);
+    display:flex; align-items:center; gap:6px;
+  }
+  .cursor{
+    width:6px; height:13px; background:var(--accent); display:inline-block;
+    animation:blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  /* ===== فرم (سمت راست) ===== */
+  .formside{ padding:36px 36px 30px; display:flex; flex-direction:column; }
+  .formside h1{ font-size:21px; margin:0 0 4px; }
+  .formside p.sub{ color:var(--muted); font-size:13px; margin:0 0 22px; }
+
+  .tabs{ display:flex; background:var(--field); border:1px solid var(--border); border-radius:12px; padding:4px; margin-bottom:24px; }
+  .tabs button{
+    flex:1; padding:9px; border:none; border-radius:9px; background:transparent;
+    color:var(--muted); font-family:var(--sans); font-size:13.5px; cursor:pointer; transition:.18s;
+  }
+  .tabs button.active{ background:var(--accent); color:#06231c; font-weight:600; }
+
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px; }
+  .field input{
+    width:100%; padding:11px 13px; border-radius:10px; border:1px solid var(--border);
+    background:var(--field); color:var(--text); font-family:var(--sans); font-size:14px;
+    transition:.15s;
+  }
+  .field input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .field small{ display:block; margin-top:5px; color:var(--muted); font-size:11px; }
+  .field small.err{ color:var(--danger); }
+  .field small.ok{ color:var(--accent); }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .btn-primary{
+    width:100%; margin-top:8px; padding:12px; border:none; border-radius:10px;
+    background:var(--accent); color:#06231c; font-family:var(--sans); font-weight:700;
+    font-size:14.5px; cursor:pointer; transition:.15s;
+  }
+  .btn-primary:hover{ filter:brightness(1.08); }
+  .btn-primary:disabled{ opacity:.55; cursor:not-allowed; }
+  .btn-ghost{
+    width:100%; margin-top:10px; padding:10px; border:1px solid var(--border); border-radius:10px;
+    background:transparent; color:var(--muted); font-family:var(--sans); font-size:13.5px; cursor:pointer;
+  }
+  .msg{ margin-top:14px; font-size:13px; min-height:16px; text-align:center; }
+  .msg.error{ color:var(--danger); }
+  .msg.success{ color:var(--accent); }
+  .hidden{ display:none !important; }
+
+  /* ===== پنل بعد از ورود ===== */
+  .profile-row{ display:flex; align-items:center; gap:16px; margin-bottom:20px; }
+  .avatar{
+    width:60px; height:60px; border-radius:50%; object-fit:cover; flex-shrink:0;
+    background:var(--field); border:2px solid var(--accent);
+  }
+  .file-pick{ font-size:12.5px; color:var(--muted); }
+  input[type=file]{ font-family:var(--sans); font-size:12.5px; color:var(--muted); }
+  .readonly-field{
+    width:100%; padding:11px 13px; border-radius:10px; border:1px dashed var(--border);
+    background:transparent; color:var(--muted); font-size:13.5px;
+  }
+
+  @media (max-width:880px){
+    .shell{ grid-template-columns:1fr; max-width:440px; }
+    .console{ border-left:none; border-bottom:1px solid var(--border); padding:24px; }
+    .console-list{ display:none; }
+    .console p.tag{ margin-bottom:0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ===== کنسول وضعیت امنیتی ===== -->
+  <aside class="console">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5v6c0 5 3.5 8.5 8 11 4.5-2.5 8-6 8-11V5l-8-3z" stroke="#34d6b4" stroke-width="1.6"/><path d="M9 12l2 2 4-4" stroke="#34d6b4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>SecureAuth</span>
+    </div>
+    <p class="tag">پروژه درس امنیت اطلاعات — احراز هویت متصل به Supabase</p>
+
+    <div class="console-list">
+      <div class="console-item">
+        <div class="tag-line">RLS</div>
+        <div class="desc">روی جدول profiles فعال است — بدون آن، کل جدول از طریق API در دسترس بود.</div>
+      </div>
+      <div class="console-item">
+        <div class="tag-line">ACCESS POLICY</div>
+        <div class="desc">هر کاربر فقط به ردیفی دسترسی دارد که auth.uid() آن با id برابر باشد.</div>
+      </div>
+      <div class="console-item">
+        <div class="tag-line">PASSWORD</div>
+        <div class="desc">هرگز متنی ذخیره نمی‌شود؛ با bcrypt توسط سرویس Auth هش می‌شود.</div>
+      </div>
+      <div class="console-item">
+        <div class="tag-line">API KEYS</div>
+        <div class="desc">فقط anon key در این صفحه است؛ service_role key هیچ‌وقت در کلاینت نیست.</div>
+      </div>
+      <div class="console-item">
+        <div class="tag-line">FILE UPLOAD</div>
+        <div class="desc">فقط تصویر، حداکثر ۲ مگابایت — هم در مرورگر، هم در Storage بررسی می‌شود.</div>
+      </div>
+      <div class="console-item">
+        <div class="tag-line">RATE LIMIT</div>
+        <div class="desc">تعداد تلاش‌های ورود/ثبت‌نام در بازه زمانی محدود شده است.</div>
+      </div>
+    </div>
+
+    <div class="console-foot"><span class="cursor"></span> status: protected</div>
+  </aside>
+
+  <!-- ===== بخش فرم ===== -->
+  <section class="formside">
+
+    <div id="auth-section">
+      <h1>به حساب خودت دسترسی پیدا کن</h1>
+      <p class="sub">برای ادامه وارد شو یا یک حساب جدید بساز</p>
+
+      <div class="tabs">
+        <button id="tab-login" class="active" onclick="switchTab('login')">ورود</button>
+        <button id="tab-signup" onclick="switchTab('signup')">ثبت‌نام</button>
+      </div>
+
+      <!-- فرم ورود -->
+      <div id="login-form">
+        <div class="field">
+          <label>نام کاربری یا ایمیل</label>
+          <input id="login-id" type="text" placeholder="username یا example@mail.com">
+        </div>
+        <div class="field">
+          <label>رمز عبور</label>
+          <input id="login-password" type="password" placeholder="••••••••">
+        </div>
+        <button class="btn-primary" id="login-btn" onclick="handleLogin()">ورود به حساب</button>
+      </div>
+
+      <!-- فرم ثبت‌نام -->
+      <div id="signup-form" class="hidden">
+        <div class="field">
+          <label>نام کاربری</label>
+          <input id="signup-username" type="text" placeholder="مثلاً ali_2003">
+          <small id="username-hint">فقط حروف انگلیسی، عدد و _ — بین ۳ تا ۲۰ کاراکتر</small>
+        </div>
+        <div class="field">
+          <label>آدرس ایمیل</label>
+          <input id="signup-email" type="email" placeholder="example@mail.com">
+        </div>
+        <div class="field">
+          <label>شماره موبایل</label>
+          <input id="signup-phone" type="text" placeholder="09xxxxxxxxx">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>رمز عبور</label>
+            <input id="signup-password" type="password" placeholder="حداقل ۶ کاراکتر">
+          </div>
+          <div class="field">
+            <label>تکرار رمز عبور</label>
+            <input id="signup-password2" type="password" placeholder="••••••••">
+          </div>
+        </div>
+        <button class="btn-primary" id="signup-btn" onclick="handleSignup()">ساخت حساب کاربری</button>
+      </div>
+
+      <div id="msg" class="msg"></div>
+    </div>
+
+    <!-- ===== پنل بعد از ورود ===== -->
+    <div id="app-section" class="hidden">
+      <h1>خوش آمدی 👋</h1>
+      <p class="sub" id="welcome-username"></p>
+
+      <div class="profile-row">
+        <img id="avatar-preview" class="avatar" src="">
+        <div>
+          <input id="avatar-file" type="file" accept="image/png, image/jpeg, image/webp">
+          <div class="file-pick">حداکثر ۲ مگابایت — فقط PNG / JPG / WEBP</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>نام کاربری</label>
+        <div class="readonly-field" id="profile-username"></div>
+      </div>
+      <div class="field">
+        <label>ایمیل</label>
+        <div class="readonly-field" id="profile-email"></div>
+      </div>
+      <div class="field">
+        <label>شماره موبایل</label>
+        <input id="profile-phone" type="text">
+      </div>
+      <button class="btn-primary" onclick="saveProfile()">ذخیره تغییرات</button>
+      <button class="btn-ghost" onclick="handleLogout()">خروج از حساب</button>
+
+      <div id="app-msg" class="msg"></div>
+    </div>
+
+  </section>
+</div>
+
+<script>
+/* =======================================================================
+   پیکربندی اتصال به Supabase
+   نکته‌ی امنیتی شماره ۴: فقط از anon key استفاده می‌شود. این کلید برای
+   مرورگر کاربر امن است چون دسترسی واقعی توسط RLS و Policy ها (نکته ۱
+   و ۲) کنترل می‌شود. service_role key هرگز نباید اینجا یا در هیچ کد
+   سمت کلاینت قرار بگیرد، چون RLS را کاملاً دور می‌زند.
+   ======================================================================= */
+const SUPABASE_URL = "https://YOUR-PROJECT-ID.supabase.co";   // از Settings > API
+const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";              // از Settings > API (anon / public)
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+
+// ---------- تب‌ها ----------
+function switchTab(tab){
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-signup').classList.toggle('active', tab==='signup');
+  document.getElementById('login-form').classList.toggle('hidden', tab!=='login');
+  document.getElementById('signup-form').classList.toggle('hidden', tab!=='signup');
+  setMsg('');
+}
+function setMsg(text, type=''){ const el=document.getElementById('msg'); el.textContent=text; el.className='msg '+type; }
+function setAppMsg(text, type=''){ const el=document.getElementById('app-msg'); el.textContent=text; el.className='msg '+type; }
+function setBtnLoading(id, loading, idleText){
+  const b=document.getElementById(id);
+  b.disabled=loading;
+  b.textContent= loading ? 'در حال انجام...' : idleText;
+}
+
+/* =======================================================================
+   ثبت‌نام
+   نکته‌ی امنیتی شماره ۳: رمز عبور هیچ‌وقت دستی پردازش یا ذخیره نمی‌شود.
+   متد supabase.auth.signUp مستقیماً رمز را به سرویس Auth می‌فرستد و آن
+   سرویس با bcrypt هش می‌کند؛ فقط نسخه‌ی هش‌شده در auth.users می‌ماند.
+   ======================================================================= */
+async function handleSignup(){
+  const username = document.getElementById('signup-username').value.trim();
+  const email    = document.getElementById('signup-email').value.trim();
+  const phone    = document.getElementById('signup-phone').value.trim();
+  const pass     = document.getElementById('signup-password').value;
+  const pass2    = document.getElementById('signup-password2').value;
+
+  if(!username || !email || !phone || !pass || !pass2){
+    setMsg('همه‌ی فیلدها را پر کنید.', 'error'); return;
+  }
+  if(!/^[a-zA-Z0-9_]{3,20}$/.test(username)){
+    setMsg('نام کاربری فقط می‌تواند حروف انگلیسی، عدد و _ باشد (۳ تا ۲۰ کاراکتر).', 'error'); return;
+  }
+  if(!/^09\d{9}$/.test(phone)){
+    setMsg('شماره موبایل را به‌صورت 09xxxxxxxxx وارد کنید.', 'error'); return;
+  }
+  if(pass.length < 6){
+    setMsg('رمز عبور باید حداقل ۶ کاراکتر باشد.', 'error'); return;
+  }
+  if(pass !== pass2){
+    setMsg('رمز عبور و تکرار آن یکسان نیستند.', 'error'); return;
+  }
+
+  setBtnLoading('signup-btn', true);
+
+  // بررسی تکراری نبودن نام کاربری قبل از ثبت‌نام
+  const { data: taken, error: takenErr } = await supabase.rpc('is_username_taken', { check_username: username });
+  if(takenErr){ setMsg('خطا: ' + takenErr.message, 'error'); setBtnLoading('signup-btn', false, 'ساخت حساب کاربری'); return; }
+  if(taken){ setMsg('این نام کاربری قبلاً استفاده شده است.', 'error'); setBtnLoading('signup-btn', false, 'ساخت حساب کاربری'); return; }
+
+  const { data, error } = await supabase.auth.signUp({
+    email, password: pass,
+    options: { data: { username, phone } }
+  });
+
+  setBtnLoading('signup-btn', false, 'ساخت حساب کاربری');
+
+  if(error){ setMsg('خطا: ' + error.message, 'error'); return; }
+
+  // اگر تایید ایمیل در تنظیمات پروژه خاموش باشد، یک نشست فعال برمی‌گردد
+  if(data.session){
+    currentUser = data.user;
+    setMsg('ثبت‌نام موفق بود! در حال ورود...', 'success');
+    await enterApp();
+  } else {
+    setMsg('ثبت‌نام موفق بود! حالا از تب «ورود» وارد شوید.', 'success');
+    switchTab('login');
+  }
+}
+
+/* =======================================================================
+   ورود با «نام کاربری یا ایمیل»
+   اگر مقدار وارد شده ایمیل نباشد، با تابع امن get_email_by_username
+   (نکته ۲) فقط ایمیل متناظر گرفته می‌شود، سپس ورود واقعی با
+   signInWithPassword انجام می‌شود.
+   ======================================================================= */
+async function handleLogin(){
+  const identifier = document.getElementById('login-id').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if(!identifier || !password){ setMsg('نام کاربری/ایمیل و رمز عبور را وارد کنید.', 'error'); return; }
+
+  setBtnLoading('login-btn', true);
+
+  let email = identifier;
+  if(!identifier.includes('@')){
+    const { data: foundEmail, error: rpcErr } = await supabase.rpc('get_email_by_username', { uname: identifier });
+    if(rpcErr || !foundEmail){
+      setMsg('نام کاربری یا رمز عبور اشتباه است.', 'error'); // پیام عمومی برای امنیت بیشتر
+      setBtnLoading('login-btn', false, 'ورود به حساب');
+      return;
+    }
+    email = foundEmail;
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  setBtnLoading('login-btn', false, 'ورود به حساب');
+
+  if(error){ setMsg('نام کاربری یا رمز عبور اشتباه است.', 'error'); return; }
+
+  currentUser = data.user;
+  await enterApp();
+}
+
+async function handleLogout(){
+  await supabase.auth.signOut();
+  currentUser = null;
+  document.getElementById('app-section').classList.add('hidden');
+  document.getElementById('auth-section').classList.remove('hidden');
+}
+
+/* =======================================================================
+   بارگذاری و ذخیره‌ی پروفایل
+   نکته‌ی امنیتی ۱ و ۲: فقط ردیف خودِ کاربر خوانده/نوشته می‌شود. حتی اگر
+   این کد را دستکاری کنیم، RLS روی پایگاه‌داده درخواست برای داده‌ی
+   کاربر دیگر را رد می‌کند.
+   ======================================================================= */
+async function loadProfile(){
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('username, phone, avatar_url')
+    .eq('id', currentUser.id)
+    .single();
+
+  document.getElementById('profile-email').textContent = currentUser.email;
+  if(!error && data){
+    document.getElementById('profile-username').textContent = data.username || '';
+    document.getElementById('profile-phone').value = data.phone || '';
+    if(data.avatar_url) document.getElementById('avatar-preview').src = data.avatar_url;
+    document.getElementById('welcome-username').textContent = '@' + (data.username || '');
+  }
+}
+
+async function saveProfile(){
+  const phone = document.getElementById('profile-phone').value.trim();
+  if(!/^09\d{9}$/.test(phone)){
+    setAppMsg('شماره موبایل معتبر نیست.', 'error'); return;
+  }
+  const { error } = await supabase.from('profiles').update({ phone }).eq('id', currentUser.id);
+  setAppMsg(error ? 'خطا در ذخیره: '+error.message : 'ذخیره شد ✅', error ? 'error':'success');
+}
+
+/* =======================================================================
+   نکته‌ی امنیتی شماره ۵: محدودسازی نوع و حجم فایل آپلودی
+   بررسی سمت مرورگر برای تجربه‌ی بهتر، و محدودیت واقعی روی باکت
+   Storage (allowed_mime_types و file_size_limit) برای امنیت واقعی.
+   ======================================================================= */
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
+const ALLOWED_TYPES = ['image/png','image/jpeg','image/webp'];
+
+document.getElementById('avatar-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
+
+  if(!ALLOWED_TYPES.includes(file.type)){
+    setAppMsg('فقط فایل تصویری PNG / JPG / WEBP مجاز است.', 'error'); e.target.value=''; return;
+  }
+  if(file.size > MAX_FILE_SIZE){
+    setAppMsg('حجم فایل نباید بیشتر از ۲ مگابایت باشد.', 'error'); e.target.value=''; return;
+  }
+
+  setAppMsg('در حال آپلود...');
+  const filePath = `${currentUser.id}/avatar-${Date.now()}.${file.name.split('.').pop()}`;
+  const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert:true });
+  if(uploadError){ setAppMsg('خطا در آپلود: '+uploadError.message, 'error'); return; }
+
+  const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+  document.getElementById('avatar-preview').src = urlData.publicUrl;
+  await supabase.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('id', currentUser.id);
+  setAppMsg('عکس پروفایل به‌روزرسانی شد ✅', 'success');
+});
+
+async function enterApp(){
+  document.getElementById('auth-section').classList.add('hidden');
+  document.getElementById('app-section').classList.remove('hidden');
+  await loadProfile();
+}
+
+// بررسی نشست فعال هنگام بازکردن صفحه
+(async () => {
+  const { data } = await supabase.auth.getSession();
+  if(data.session){ currentUser = data.session.user; await enterApp(); }
+})();
+</script>
+</body>
+</html>
